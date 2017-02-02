@@ -42,8 +42,10 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		postfiles = []
 		try:
 			#decode request json
-			reqJson = self.rfile.read(int(self.headers.getheader('content-length')))
-			req = json.loads(reqJson)
+			req = {}
+			if self.headers.getheader('content-length') != None:
+				length = int(self.headers.getheader('content-length'))
+				req = json.loads(self.rfile.read(length))
 
 			#find method
 			apiMethod = self.getApiMethod(self.path)

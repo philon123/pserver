@@ -8,10 +8,12 @@ import base64
 import md5
 from SocketServer import ThreadingMixIn
 import threading
+import traceback
+import inspect
 import requests
 import api
 
-PSERVER_VERSION = "1.0.0"
+PSERVER_VERSION = "1.1.0"
 
 class PserverException(Exception):
 	pass
@@ -39,12 +41,27 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		starttime = time.time()
 		postfiles = []
 		try:
-			(path, getvars, postvars, postfiles) = self.getRequestVars()
+			#decode request json
+			reqJson = self.rfile.read(int(self.headers.getheader('content-length')))
+			req = json.loads(reqJson)
+
+			#find method
+			apiMethod = self.getApiMethod(self.path)
+			if req.keys() != inspect.getargspec(apiMethod).args:
+				raise PserverException('Missing expected parameters: Expected {expected}, got {got}'
+					.format(
+						expected = inspect.getargspec(apiMethod).args,
+						got = req.keys()
+					)
+				)
 
 			#execute method
-			apiMethod = self.getApiMethod(path)
-			result = apiMethod(getvars, postvars, postfiles)
+			result = apiMethod(**req)
+
+			#process response
 			self.verifyResultFormat(result)
+		except ValueError as e:
+			raise PserverException("Request is not valid Json: " + reqJson)
 		except PserverException as e:
 			result = {
 				'status':'error',
@@ -53,7 +70,7 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		except Exception as e:
 			result = {
 				'status':'error',
-				'result':'Processing exception: ' + repr(e)
+				'result':'Processing exception: ' + traceback.format_exc()
 			}
 		finally:
 			for f in postfiles:
@@ -69,41 +86,11 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.end_headers()
 		self.wfile.write(json.dumps(result, indent=4))
 
-	def getRequestVars(self):
-		path = self.path.split('?')[0] if '?' in self.path else self.path
-		if path.startswith('/'): path = path[1:]
-		getvars = urlparse.parse_qs(urlparse.urlparse(self.path).query)
-		postvars = {}
-		postfiles = []
-
-		if self.headers.getheader('content-length') != None:
-			length = int(self.headers.getheader('content-length'))
-			reqJson = self.rfile.read(length)
-			try:
-				req = json.loads(reqJson)
-			except ValueError as e:
-				raise PserverException("Request is not valid Json: " + reqJson)
-			for k,v in req.iteritems():
-				if isinstance(v, dict) and 'filename' in v:
-					fileName = v['filename']
-					tmpFilename = '/tmp/req' + md5.new(fileName + str(int(time.time()*1000))).hexdigest()
-					with open(tmpFilename, 'wb') as tf:
-						tf.write(base64.b64decode(v['content']))
-					postfiles.append({
-						"filename": fileName,
-						"path": tmpFilename
-					})
-				else: #otherwise, its an arg
-					postvars[k] = v
-
-			#sort postfiles by filename
-			postfiles = sorted(postfiles, key=lambda f: f['filename'])
-		return (path, getvars, postvars, postfiles)
-
 	def getApiMethod(self, path):
 		if path == '':
 			print "Aborted handling request because no command was given. "
 			raise PserverException('You need to specify a command')
+		if path.startswith('/'): path = path[1:]
 
 		pathParts = path.split('/')
 		apiModuleName = 'api.' + '.'.join(pathParts[:-1])

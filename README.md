@@ -22,7 +22,18 @@ result:
     "result": "Phil"
 }
 
+curl -X POST http://127.0.0.1:8080/test/subtest/sayHello
+result:
+{
+    "status": "ok",
+    "result": "Hello again!"
+}
+
 #Changelog / feature list
+
+v1.1.0
+* Remove support for GET-vars and automatic preprocessing of files.
+* Named parameters are enforced. Parameters that are lists or dicts are not further checked though.
 
 v1.0.0
 * It works

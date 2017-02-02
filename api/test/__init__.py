@@ -1,12 +1,12 @@
-def sayHello(getvars, postvars, postfiles):
+import subtest
+
+def sayHello():
 	return dict(
 		status = 'ok',
 		result = 'Hello!'
 	)
 
-def sayMyName(getvars, postvars, postfiles):
-	name = postvars['name']
-
+def sayMyName(name):
 	return dict(
 		status = 'ok',
 		result = name

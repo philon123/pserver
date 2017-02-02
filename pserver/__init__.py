@@ -1,5 +1,4 @@
 import sys
-import os
 import time
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -8,9 +7,9 @@ import threading
 import traceback
 import inspect
 import requests
-import api
+#from . import api
 
-PSERVER_VERSION = "1.1.1"
+PSERVER_VERSION = "1.2.1"
 
 class PserverException(Exception):
 	pass
@@ -36,7 +35,6 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 	def do_POST(self):
 		starttime = time.time()
-		postfiles = []
 		try:
 			#decode request json
 			req = {}
@@ -45,22 +43,9 @@ class RequestHandler(BaseHTTPRequestHandler):
 				reqJson = str(self.rfile.read(length), 'utf-8')
 				req = json.loads(reqJson)
 
-			#find method
+			#find and execute method
 			apiMethod = self.getApiMethod(self.path)
-			print(inspect.signature(apiMethod))
-			if list(req.keys()) != inspect.getargspec(apiMethod).args:
-				raise PserverException('Problem with parameters: Expected {expected}, got {got}'
-					.format(
-						expected = inspect.getargspec(apiMethod).args,
-						got = req.keys()
-					)
-				)
-
-			#execute method
-			result = apiMethod(**req)
-
-			#process response
-			self.verifyResultFormat(result)
+			result = self.executeApiMethod(apiMethod, req)
 		except ValueError as e:
 			raise PserverException("Request is not valid Json: " + reqJson)
 		except PserverException as e:
@@ -73,13 +58,10 @@ class RequestHandler(BaseHTTPRequestHandler):
 				'status':'error',
 				'result':'Processing exception: ' + traceback.format_exc()
 			}
-		finally:
-			for f in postfiles:
-				os.remove(f['path'])
 
 		if result['status'] == 'error':
 			print(json.dumps(result, indent=4))
-		print("done. processing time " + str(round(time.time()-starttime, 2)) + "s")
+		print('{f} took {time}s to answer'.format(f = self.path, time = round(time.time()-starttime, 2)))
 
 		#return result
 		self.send_response(200)
@@ -109,21 +91,36 @@ class RequestHandler(BaseHTTPRequestHandler):
 		if not (isinstance(result, dict) and 'status' in result and 'result' in result):
 			raise PserverException('Bad result format: ' + str(result))
 
+	def executeApiMethod(self, apiMethod, req):
+		#check parameters
+		#TODO only the existance of the params is checked here. we need to be able to define the complete data structure
+		if list(req.keys()) != inspect.getargspec(apiMethod).args:
+			raise PserverException('Problem with parameters: Expected {expected}, got {got}'
+				.format(
+					expected = inspect.getargspec(apiMethod).args,
+					got = req.keys()
+				)
+			)
+
+		result = apiMethod(**req)
+		self.verifyResultFormat(result)
+		return result
+
 #Handle requests in a separate thread
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 	pass
 
-server = ThreadedHTTPServer(('', 8080), RequestHandler)
+server = None
+context = {}
 def start():
-	print("Started PServer. ")
+	global server
+	server = ThreadedHTTPServer(('', 8080), RequestHandler)
 	t = threading.Thread(target=server.serve_forever)
 	t.daemon = True
 	t.start()
+	print("Started PServer")
 
 def stop():
+	print("Stopping PServer...")
 	server.shutdown()
-
-if __name__ == '__main__':
-	start()
-	while True:
-		time.sleep(1)
+	print("Stopped PServer")

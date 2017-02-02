@@ -4,25 +4,25 @@ PServer is a simple web server that accepts only POST requests with JSON content
 
 Answers are also JSON, in the format {"status": S, "result": R} where S is either "ok" or "error" and R can be any value, including objects and arrays.
 
-API functions are organized into nested folders inside the "api" directory. Organize your code just like the "test" folder is organized.
+The library itself is included with `import pserver`. You must also include a module `api` that will hold submodules containing your api callbacks. The resulting directory structure is reflected in how you call your functions. 
 
-After starting the server with "python pserver.py" test the server as such:
+After starting the example api with "python example.py" test the server as such:
 
-curl -X POST http://127.0.0.1:8080/test/sayHello
+curl -X POST http://127.0.0.1:8080/myapi/sayHello
 result:
 {
     "status": "ok",
     "result": "Hello!"
 }
 
-curl -X POST http://127.0.0.1:8080/test/sayMyName --data '{"name":"Phil"}'
+curl -X POST http://127.0.0.1:8080/myapi/sayMyName --data '{"name":"Phil"}'
 result:
 {
     "status": "ok",
     "result": "Phil"
 }
 
-curl -X POST http://127.0.0.1:8080/test/subtest/sayHello
+curl -X POST http://127.0.0.1:8080/myapi/subsection/sayHello
 result:
 {
     "status": "ok",
@@ -30,6 +30,10 @@ result:
 }
 
 #Changelog / feature list
+
+v1.2.0
+* Migrated to Python 3.5
+* make PServer a library, not a framework
 
 v1.1.0
 * Remove support for GET-vars and automatic preprocessing of files.

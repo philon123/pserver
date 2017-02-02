@@ -13,7 +13,7 @@ import inspect
 import requests
 import api
 
-PSERVER_VERSION = "1.1.0"
+PSERVER_VERSION = "1.1.1"
 
 class PserverException(Exception):
 	pass
@@ -113,32 +113,6 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 #Handle requests in a separate thread
 class ThreadedHTTPServer(ThreadingMixIn, BaseHTTPServer.HTTPServer):
 	pass
-
-def download_file(url):
-	local_filename = '/tmp/' + url.split('/')[-1]
-	r = requests.get(url, stream=True)
-	with open(local_filename, 'wb') as f:
-		for chunk in r.iter_content(chunk_size=1024):
-			if chunk: # filter out keep-alive new chunks
-				f.write(chunk)
-	if r.status_code != 200:
-		raise Exception('Could not download file ' + url)
-	return local_filename
-
-#TODO
-def callApiFunction(apiModule, cmdName, postvars, postfiles):
-	#check if fuction and spec exist
-
-
-	#check parameters
-	args = []
-
-	#execute function
-	result = getattr(sys.modules[apiModule], cmdName)(*args)
-
-
-	#check results
-
 
 if __name__ == '__main__':
 	server = ThreadedHTTPServer(('', 8080), RequestHandler)

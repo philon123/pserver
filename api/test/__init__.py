@@ -2,7 +2,6 @@ import subtest
 import time
 
 def sayHello():
-	time.sleep(5)
 	return dict(
 		status = 'ok',
 		result = 'Hello!'

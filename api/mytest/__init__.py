@@ -1,4 +1,4 @@
-import subtest
+import api.mytest.subtest
 import time
 
 def sayHello():

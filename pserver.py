@@ -2,11 +2,8 @@ import sys
 import os
 import time
 import json
-import BaseHTTPServer
-import urlparse
-import base64
-import md5
-from SocketServer import ThreadingMixIn
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
 import threading
 import traceback
 import inspect
@@ -18,7 +15,7 @@ PSERVER_VERSION = "1.1.1"
 class PserverException(Exception):
 	pass
 
-class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class RequestHandler(BaseHTTPRequestHandler):
 	#disable logging of every incoming request. only log errors
 	def log_request(self, code='-', size='-'):
 		pass
@@ -33,9 +30,9 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		self.send_header("Content-type", "text/html")
 		self.end_headers()
 
-		print 'GET request ignored.'
+		print('GET request ignored.')
 
-		self.wfile.write('POST only')
+		self.wfile.write(bytes('POST only', 'utf-8'))
 
 	def do_POST(self):
 		starttime = time.time()
@@ -43,14 +40,16 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 		try:
 			#decode request json
 			req = {}
-			if self.headers.getheader('content-length') != None:
-				length = int(self.headers.getheader('content-length'))
-				req = json.loads(self.rfile.read(length))
+			if self.headers.get_all(name='content-length') != None:
+				length = int(self.headers.get_all(name='content-length')[0])
+				reqJson = str(self.rfile.read(length), 'utf-8')
+				req = json.loads(reqJson)
 
 			#find method
 			apiMethod = self.getApiMethod(self.path)
-			if req.keys() != inspect.getargspec(apiMethod).args:
-				raise PserverException('Missing expected parameters: Expected {expected}, got {got}'
+			print(inspect.signature(apiMethod))
+			if list(req.keys()) != inspect.getargspec(apiMethod).args:
+				raise PserverException('Problem with parameters: Expected {expected}, got {got}'
 					.format(
 						expected = inspect.getargspec(apiMethod).args,
 						got = req.keys()
@@ -79,18 +78,18 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 				os.remove(f['path'])
 
 		if result['status'] == 'error':
-			print json.dumps(result, indent=4)
-		print "done. processing time " + str(round(time.time()-starttime, 2)) + "s"
+			print(json.dumps(result, indent=4))
+		print("done. processing time " + str(round(time.time()-starttime, 2)) + "s")
 
 		#return result
 		self.send_response(200)
 		self.send_header("Content-type", "application/json")
 		self.end_headers()
-		self.wfile.write(json.dumps(result, indent=4))
+		self.wfile.write(bytes(json.dumps(result, indent=4), 'utf-8'))
 
 	def getApiMethod(self, path):
 		if path == '':
-			print "Aborted handling request because no command was given. "
+			print("Aborted handling request because no command was given. ")
 			raise PserverException('You need to specify a command')
 		if path.startswith('/'): path = path[1:]
 
@@ -102,19 +101,29 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 			apiModule = sys.modules[apiModuleName]
 			return getattr(apiModule, apiMethodName)
 		except (KeyError, AttributeError) as e:
-			print "Unknown or invalid command supplied: " + path
+			print("Unknown or invalid command supplied: " + path)
 			raise PserverException('Unknown or invalid command')
-		print "Handling command: " + apiMethodName + " in module " + apiModuleName
+		print("Handling command: " + apiMethodName + " in module " + apiModuleName)
 
 	def verifyResultFormat(self, result):
 		if not (isinstance(result, dict) and 'status' in result and 'result' in result):
 			raise PserverException('Bad result format: ' + str(result))
 
 #Handle requests in a separate thread
-class ThreadedHTTPServer(ThreadingMixIn, BaseHTTPServer.HTTPServer):
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 	pass
 
+server = ThreadedHTTPServer(('', 8080), RequestHandler)
+def start():
+	print("Started PServer. ")
+	t = threading.Thread(target=server.serve_forever)
+	t.daemon = True
+	t.start()
+
+def stop():
+	server.shutdown()
+
 if __name__ == '__main__':
-	server = ThreadedHTTPServer(('', 8080), RequestHandler)
-	print "Started server. "
-	server.serve_forever()
+	start()
+	while True:
+		time.sleep(1)

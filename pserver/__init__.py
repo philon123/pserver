@@ -6,10 +6,8 @@ from socketserver import ThreadingMixIn
 import threading
 import traceback
 import inspect
-import requests
-#from . import api
 
-PSERVER_VERSION = "1.2.1"
+PSERVER_VERSION = "1.2.2"
 
 class PserverException(Exception):
 	pass

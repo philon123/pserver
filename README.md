@@ -37,6 +37,9 @@ curl -X POST http://127.0.0.1/mytest/insertToDb --data '{"name":"Phil"}'
 
 #Changelog / feature list
 
+v1.4.0
+* Serve GET requests and return any file requested from inside the html directory. Example included
+
 v1.3.0
 * Requests are handled by subclasses of BasePServerRequestHandler
 * preExec and postExec methods for preprocessing and cleanup

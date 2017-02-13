@@ -1,4 +1,5 @@
 import sys
+import os
 import time
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -7,7 +8,7 @@ import threading
 import traceback
 import inspect
 
-PSERVER_VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 class PserverException(Exception):
 	pass
@@ -23,13 +24,17 @@ class RequestHandler(BaseHTTPRequestHandler):
 		self.end_headers()
 
 	def do_GET(self):
-		self.send_response(404)
+		self.send_response(200)
 		self.send_header("Content-type", "text/html")
 		self.end_headers()
 
-		print('GET request ignored.')
+		baseDir = os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
+		if self.path == '/': self.path = '/index.html'
+		with open(baseDir + self.path, 'rb') as f:
+			self.wfile.write(f.read())
 
-		self.wfile.write(bytes('POST only', 'utf-8'))
+		#print('GET request ignored.')
+		#self.wfile.write(bytes('POST only', 'utf-8'))
 
 	def do_POST(self):
 		starttime = time.time()

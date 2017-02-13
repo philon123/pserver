@@ -18,6 +18,7 @@ class sayMyName(pserver.PServerRequestHandler):
 			result = name
 		)
 
+
 #example for RequestHandler that does some db stuff. It uses a cutom RequestHandler class defined in the api module
 class insertToDb(MyRequestHandler):
 	def execute(self, name):

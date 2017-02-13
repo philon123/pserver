@@ -7,7 +7,7 @@ import threading
 import traceback
 import inspect
 
-PSERVER_VERSION = "1.2.2"
+PSERVER_VERSION = "1.3.0"
 
 class PserverException(Exception):
 	pass
@@ -42,8 +42,8 @@ class RequestHandler(BaseHTTPRequestHandler):
 				req = json.loads(reqJson)
 
 			#find and execute method
-			apiMethod = self.getApiMethod(self.path)
-			result = self.executeApiMethod(apiMethod, req)
+			requestHandler = self.getRequestHandler(self.path)
+			result = self.executeApiMethod(requestHandler, req)
 		except ValueError as e:
 			raise PserverException("Request is not valid Json: " + reqJson)
 		except PserverException as e:
@@ -67,52 +67,68 @@ class RequestHandler(BaseHTTPRequestHandler):
 		self.end_headers()
 		self.wfile.write(bytes(json.dumps(result, indent=4), 'utf-8'))
 
-	def getApiMethod(self, path):
+	def getRequestHandler(self, path):
 		if path == '':
 			print("Aborted handling request because no command was given. ")
 			raise PserverException('You need to specify a command')
 		if path.startswith('/'): path = path[1:]
 
 		pathParts = path.split('/')
-		apiModuleName = 'api.' + '.'.join(pathParts[:-1])
-		apiMethodName = pathParts[-1]
+		rhModuleName = 'api.' + '.'.join(pathParts[:-1])
+		rhName = pathParts[-1]
 
 		try:
-			apiModule = sys.modules[apiModuleName]
-			return getattr(apiModule, apiMethodName)
+			apiModule = sys.modules[rhModuleName]
+			return getattr(apiModule, rhName)
 		except (KeyError, AttributeError) as e:
 			print("Unknown or invalid command supplied: " + path)
 			raise PserverException('Unknown or invalid command')
-		print("Handling command: " + apiMethodName + " in module " + apiModuleName)
+		print("Handling request: " + rhName + " in module " + rhModuleName)
 
-	def verifyResultFormat(self, result):
-		if not (isinstance(result, dict) and 'status' in result and 'result' in result):
-			raise PserverException('Bad result format: ' + str(result))
-
-	def executeApiMethod(self, apiMethod, req):
-		#check parameters
-		#TODO only the existance of the params is checked here. we need to be able to define the complete data structure
-		if list(req.keys()) != inspect.getargspec(apiMethod).args:
-			raise PserverException('Problem with parameters: Expected {expected}, got {got}'
-				.format(
-					expected = inspect.getargspec(apiMethod).args,
-					got = req.keys()
-				)
-			)
-
-		result = apiMethod(**req)
-		self.verifyResultFormat(result)
+	def executeApiMethod(self, requestHandler, req):
+		rh = requestHandler(context, req)
+		result = rh.execute_internal()
 		return result
 
 #Handle requests in a separate thread
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 	pass
 
+class PServerRequestHandler:
+	def __init__(self, context, args):
+		self.context = context
+		self.args = args
+		self.checkArgs()
+	def checkArgs(self):
+		#TODO only the existance of the params is checked here. we need to be able to define the complete data structure
+		expectedArgs = inspect.getargspec(self.execute).args
+		expectedArgs.remove('self')
+		if list(self.args.keys()) != expectedArgs:
+			raise PserverException('Problem with parameters: Expected {expected}, got {got}'
+			.format(expected = expectedArgs, got = self.args.keys())
+			)
+	def execute_internal(self):
+		self.preExec()
+		result = self.execute(**self.args)
+		self.verifyResultFormat(result)
+		self.postExec()
+		return result
+	def preExec(self):
+		pass
+	def execute(self):
+		raise PserverException('Request Handler "' + type(self).__name__ + '" not implemented')
+	def postExec(self):
+		pass
+	def verifyResultFormat(self, result):
+		if not (isinstance(result, dict) and 'status' in result and 'result' in result):
+			raise PserverException('Bad result format: ' + str(result))
+
+PORT = 80
 server = None
 context = {}
 def start():
 	global server
-	server = ThreadedHTTPServer(('', 8080), RequestHandler)
+	server = ThreadedHTTPServer(('', PORT), RequestHandler)
 	t = threading.Thread(target=server.serve_forever)
 	t.daemon = True
 	t.start()
@@ -122,3 +138,7 @@ def stop():
 	print("Stopping PServer...")
 	server.shutdown()
 	print("Stopped PServer")
+
+def setContext(c):
+	global context
+	context = c

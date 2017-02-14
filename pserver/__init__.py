@@ -108,9 +108,11 @@ class PServerRequestHandler:
 		#TODO only the existance of the params is checked here. we need to be able to define the complete data structure
 		expectedArgs = inspect.getargspec(self.execute).args
 		expectedArgs.remove('self')
-		if list(self.args.keys()) != expectedArgs:
+		expectedArgs.sort()
+		gotArgs = sorted(list(self.args.keys()))
+		if gotArgs != expectedArgs:
 			raise PserverException('Problem with parameters: Expected {expected}, got {got}'
-			.format(expected = expectedArgs, got = self.args.keys())
+				.format(expected = expectedArgs, got = gotArgs)
 			)
 	def execute_internal(self):
 		self.preExec()

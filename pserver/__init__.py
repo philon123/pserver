@@ -8,10 +8,14 @@ import threading
 import traceback
 import inspect
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 
 class PserverException(Exception):
 	pass
+
+def to_json(python_object): #serialte bytes objects
+    	if isinstance(python_object, bytes): return python_object.decode('utf-8')
+        raise TypeError(repr(python_object) + ' is not JSON serializable')
 
 class RequestHandler(BaseHTTPRequestHandler):
 	#disable logging of every incoming request. only log errors
@@ -62,15 +66,14 @@ class RequestHandler(BaseHTTPRequestHandler):
 				'result':'Processing exception: ' + traceback.format_exc()
 			}
 
-		if result['status'] == 'error':
-			print(json.dumps(result, indent=4))
+		#if result['status'] == 'error': print(json.dumps(result, indent=4))
 		print('{f} took {time}s to answer'.format(f = self.path, time = round(time.time()-starttime, 2)))
 
 		#return result
 		self.send_response(200)
 		self.send_header("Content-type", "application/json")
 		self.end_headers()
-		self.wfile.write(bytes(json.dumps(result, indent=4), 'utf-8'))
+		self.wfile.write(bytes(json.dumps(result, indent=4, default=to_json), 'utf-8'))
 
 	def getRequestHandler(self, path):
 		if path == '':

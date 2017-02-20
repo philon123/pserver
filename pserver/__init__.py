@@ -14,8 +14,8 @@ class PserverException(Exception):
 	pass
 
 def to_json(python_object): #serialte bytes objects
-		if isinstance(python_object, bytes): return python_object.decode('utf-8')
-		raise TypeError(repr(python_object) + ' is not JSON serializable')
+	if isinstance(python_object, bytes): return python_object.decode('utf-8')
+	raise TypeError(repr(python_object) + ' is not JSON serializable')
 
 class RequestHandler(BaseHTTPRequestHandler):
 	#disable logging of every incoming request. only log errors

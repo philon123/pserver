@@ -8,12 +8,12 @@ import threading
 import traceback
 import inspect
 
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 
 class PserverException(Exception):
 	pass
 
-def to_json(python_object): #serialte bytes objects
+def to_json(python_object): #serialze bytes objects
 	if isinstance(python_object, bytes): return python_object.decode('utf-8')
 	raise TypeError(repr(python_object) + ' is not JSON serializable')
 
@@ -32,13 +32,13 @@ class RequestHandler(BaseHTTPRequestHandler):
 		self.send_header("Content-type", "text/html")
 		self.end_headers()
 
-		baseDir = os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
 		if self.path == '/': self.path = '/index.html'
-		with open(baseDir + self.path, 'rb') as f:
+		baseDir = os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
+		targetFile = baseDir + self.path
+		if not os.path.abspath(targetFile).startswith(baseDir):
+			raise Exception("Trying to read out of scope file: " + targetFile)
+		with open(targetFile, 'rb') as f:
 			self.wfile.write(f.read())
-
-		#print('GET request ignored.')
-		#self.wfile.write(bytes('POST only', 'utf-8'))
 
 	def do_POST(self):
 		starttime = time.time()

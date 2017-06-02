@@ -8,34 +8,38 @@ The library itself is included with `import pserver`. You must also include a mo
 
 After starting the example api with "sudo python3 example.py" test the server as such:
 
-curl -X POST http://127.0.0.1/myapi/sayHello
+request: `curl -X POST http://127.0.0.1/myapi/sayHello`<br>
 result:
-{
+`{
     "status": "ok",
     "result": "Hello!"
-}
+}`
 
-curl -X POST http://127.0.0.1/myapi/sayMyName --data '{"name":"Phil"}'
+request: `curl -X POST http://127.0.0.1/myapi/sayMyName --data '{"name":"Phil"}'`<br>
 result:
-{
+`{
     "status": "ok",
     "result": "Phil"
-}
+}`
 
-curl -X POST http://127.0.0.1/myapi/subsection/sayHello
+request: `curl -X POST http://127.0.0.1/myapi/subsection/sayHello`<br>
 result:
-{
+`{
     "status": "ok",
     "result": "Hello again!"
-}
+}`
 
-curl -X POST http://127.0.0.1/mytest/insertToDb --data '{"name":"Phil"}'
-{
+request: `curl -X POST http://127.0.0.1/mytest/insertToDb --data '{"name":"Phil"}'`<br>
+result:
+`{
     "result": "Saved Phil to the database!",
     "status": "ok"
-}
+}`
 
 #Changelog / feature list
+
+v1.4.2
+* Make sure files outside of the html dir aren't reachable
 
 v1.4.0
 * Serve GET requests and return any file requested from inside the html directory. Example included

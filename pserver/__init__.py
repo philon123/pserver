@@ -44,11 +44,11 @@ class RequestHandler(BaseHTTPRequestHandler):
 		starttime = time.time()
 		try:
 			#decode request json
-			req = {}
+			req = dict()
 			if self.headers.get_all(name='content-length') != None:
 				length = int(self.headers.get_all(name='content-length')[0])
 				reqJson = str(self.rfile.read(length), 'utf-8')
-				req = json.loads(reqJson)
+				req = json.loads(reqJson) if len(reqJson)>0 else dict()
 
 			#find and execute method
 			requestHandler = self.getRequestHandler(self.path)

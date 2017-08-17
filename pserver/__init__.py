@@ -8,7 +8,7 @@ import threading
 import traceback
 import inspect
 
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 class PserverException(Exception):
 	pass

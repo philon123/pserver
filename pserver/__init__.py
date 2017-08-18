@@ -8,17 +8,17 @@ import threading
 import traceback
 import inspect
 
-VERSION = "1.4.4"
+VERSION = "1.4.5"
 
 class PserverException(Exception):
 	pass
 
-def to_json(python_object): #serialze bytes objects
+def to_json(python_object): # serialize bytes objects
 	if isinstance(python_object, bytes): return python_object.decode('utf-8')
 	raise TypeError(repr(python_object) + ' is not JSON serializable')
 
 class RequestHandler(BaseHTTPRequestHandler):
-	#disable logging of every incoming request. only log errors
+	# disable logging of every incoming request. only log errors
 	def log_request(self, code='-', size='-'):
 		pass
 
@@ -28,34 +28,56 @@ class RequestHandler(BaseHTTPRequestHandler):
 		self.end_headers()
 
 	def do_GET(self):
-		self.send_response(200)
-
-		# check requested file and make sure it's safe to send
-		if self.path == '/': self.path = '/index.html'
-		baseDir = os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
-		targetFile = os.path.abspath(baseDir + self.path)
-		if not os.path.abspath(targetFile).startswith(baseDir):
-			raise Exception("Trying to read out of scope file: " + targetFile)
+		# check file exists and is allowed to access
+		try:
+			targetPath = self.checkAccess(self.path)
+		except Exception as e:
+			self.send_response(404)
+			self.send_header("Content-type", 'text/html')
+			self.end_headers()
+			self.wfile.write('File not found'.encode('utf-8'))
+			return
 
 		# guess correct content type and send file
-		f,extension = os.path.splitext(targetFile)
+		f,extension = os.path.splitext(targetPath)
 		contentType = 'text/css' if extension == '.css' else 'text/html'
+
+		# send response
+		self.send_response(200)
 		self.send_header("Content-type", contentType)
 		self.end_headers()
-		with open(targetFile, 'rb') as f:
+		with open(targetPath, 'rb') as f:
 			self.wfile.write(f.read())
+
+	def checkAccess(self, targetPath):
+		# format targetPath to be an absolute path
+		if targetPath == '/': targetPath = '/index.html'
+		baseDir = os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
+		targetPath = os.path.abspath(baseDir + targetPath)
+
+		# make sure file exist and is allowed
+		isFileExisting = os.path.isfile(targetPath)
+		isFileAllowed = os.path.abspath(targetPath).startswith(baseDir)
+		if not isFileAllowed:
+			print("Trying to read out of scope file: " + targetPath) # log this as it may be an attacker
+			raise PserverException('File does not exist')
+		if not isFileExisting:
+			raise PserverException('File does not exist')
+
+		# return valid, allowed file path
+		return targetPath
 
 	def do_POST(self):
 		starttime = time.time()
 		try:
-			#decode request json
+			# decode request json
 			req = dict()
 			if self.headers.get_all(name='content-length') != None:
 				length = int(self.headers.get_all(name='content-length')[0])
 				reqJson = str(self.rfile.read(length), 'utf-8')
 				req = json.loads(reqJson) if len(reqJson)>0 else dict()
 
-			#find and execute method
+			# find and execute method
 			requestHandler = self.getRequestHandler(self.path)
 			result = self.executeApiMethod(requestHandler, req)
 		except ValueError as e:
@@ -71,10 +93,9 @@ class RequestHandler(BaseHTTPRequestHandler):
 				'result':'Processing exception: ' + traceback.format_exc()
 			}
 
-		#if result['status'] == 'error': print(json.dumps(result, indent=4))
+		# if result['status'] == 'error': print(json.dumps(result, indent=4))
 		print('{f} took {time}s to answer'.format(f = self.path, time = round(time.time()-starttime, 2)))
 
-		#return result
 		self.send_response(200)
 		self.send_header("Content-type", "application/json")
 		self.end_headers()
@@ -94,7 +115,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 			apiModule = sys.modules[rhModuleName]
 			return getattr(apiModule, rhName)
 		except (KeyError, AttributeError) as e:
-			print("Unknown or invalid command supplied: " + path)
+			print("Unknown or invalid command: " + path)
 			raise PserverException('Unknown or invalid command')
 		print("Handling request: " + rhName + " in module " + rhModuleName)
 
@@ -103,7 +124,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 		result = rh.execute_internal()
 		return result
 
-#Handle requests in a separate thread
+# Handle requests in a separate thread
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 	pass
 
@@ -113,7 +134,7 @@ class PServerRequestHandler:
 		self.args = args
 		self.checkArgs()
 	def checkArgs(self):
-		#TODO only the existance of the params is checked here. we need to be able to define the complete data structure
+		# TODO only the existance of the params is checked here. we need to be able to define the complete data structure
 		expectedArgs = inspect.getargspec(self.execute).args
 		expectedArgs.remove('self')
 		expectedArgs.sort()

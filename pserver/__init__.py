@@ -8,7 +8,7 @@ import threading
 import traceback
 import inspect
 
-VERSION = "1.4.3"
+VERSION = "1.4.4"
 
 class PserverException(Exception):
 	pass
@@ -29,14 +29,19 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 	def do_GET(self):
 		self.send_response(200)
-		self.send_header("Content-type", "text/html")
-		self.end_headers()
 
+		# check requested file and make sure it's safe to send
 		if self.path == '/': self.path = '/index.html'
 		baseDir = os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
-		targetFile = baseDir + self.path
+		targetFile = os.path.abspath(baseDir + self.path)
 		if not os.path.abspath(targetFile).startswith(baseDir):
 			raise Exception("Trying to read out of scope file: " + targetFile)
+
+		# guess correct content type and send file
+		f,extension = os.path.splitext(targetFile)
+		contentType = 'text/css' if extension == '.css' else 'text/html'
+		self.send_header("Content-type", contentType)
+		self.end_headers()
 		with open(targetFile, 'rb') as f:
 			self.wfile.write(f.read())
 

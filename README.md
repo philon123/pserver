@@ -1,4 +1,4 @@
-#What is this?
+# What is this?
 
 PServer is a simple web server that accepts only POST requests with JSON content and answers all requests in json. The motivation for this code is that other server libraries are really large, but I often only need this tiny subset of features.
 
@@ -8,35 +8,46 @@ The library itself is included with `import pserver`. You must also include a mo
 
 After starting the example api with "sudo python3 example.py" test the server as such:
 
-request: `curl -X POST http://127.0.0.1/myapi/sayHello`<br>
-result:
-`{
+#### Basic example: <br>
+request: `curl -X POST http://127.0.0.1/mymodule/sayHello`<br>
+```javascript 
+{
     "status": "ok",
     "result": "Hello!"
-}`
+}
+```
 
-request: `curl -X POST http://127.0.0.1/myapi/sayMyName --data '{"name":"Phil"}'`<br>
-result:
-`{
+#### Parameters: <br>
+request: `curl -X POST http://127.0.0.1/mymodule/sayMyName --data '{"name":"Phil"}'`<br>
+```javascript 
+{
     "status": "ok",
     "result": "Phil"
-}`
+}
+```
 
-request: `curl -X POST http://127.0.0.1/myapi/subsection/sayHello`<br>
-result:
-`{
+#### Nested modules: <br>
+request: `curl -X POST http://127.0.0.1/mymodule/submodule/sayHello`<br>
+```javascript 
+{
     "status": "ok",
-    "result": "Hello again!"
-}`
+    "result": "Hello from submodule!"
+}
+```
 
-request: `curl -X POST http://127.0.0.1/mytest/insertToDb --data '{"name":"Phil"}'`<br>
-result:
-`{
+#### Context usage: <br>
+request: `curl -X POST http://127.0.0.1/mymodule/insertToDb --data '{"name":"Phil"}'`<br>
+```javascript 
+{
     "result": "Saved Phil to the database!",
     "status": "ok"
-}`
+}
+```
 
-#Changelog / feature list
+# Changelog / feature list
+
+v1.5.0
+* Allow configuration of port and baseDir
 
 v1.4.2
 * Make sure files outside of the html dir aren't reachable

@@ -1,5 +1,5 @@
 import pserver #we always need the pserver module to use the PServerRequestHandler class
-from . import subsection #include a sub module for a nested api
+from . import submodule #include a sub module for a nested api
 from MyRequestHandler import MyRequestHandler
 
 #basic example
@@ -7,7 +7,7 @@ class sayHello(pserver.PServerRequestHandler):
 	def execute(self):
 		return dict(
 			status = 'ok',
-			result = 'Hello! Global variable is ' + str(self.context['GLOBAL_VARIABLE'])
+			result = 'Hello!'
 		)
 
 #example to show parameter usage

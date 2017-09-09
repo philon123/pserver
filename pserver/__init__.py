@@ -8,17 +8,17 @@ import threading
 import traceback
 import inspect
 
-VERSION = "1.4.5"
+VERSION = "1.5.0"
 
 class PserverException(Exception):
 	pass
 
-def to_json(python_object): # serialize bytes objects
+def to_json(python_object): #serialze bytes objects
 	if isinstance(python_object, bytes): return python_object.decode('utf-8')
 	raise TypeError(repr(python_object) + ' is not JSON serializable')
 
 class RequestHandler(BaseHTTPRequestHandler):
-	# disable logging of every incoming request. only log errors
+	#disable logging of every incoming request. only log errors
 	def log_request(self, code='-', size='-'):
 		pass
 
@@ -35,7 +35,16 @@ class RequestHandler(BaseHTTPRequestHandler):
 			self.send_response(404)
 			self.send_header("Content-type", 'text/html')
 			self.end_headers()
-			self.wfile.write('File not found'.encode('utf-8'))
+			self.wfile.write('''
+			<html>
+				<head>
+					<title>404 Not Found</title>
+				</head>
+				<body>
+					<h1 style="text-align:center;">Error 404 - File not found</h1>
+				</body>
+			</html>
+			'''.encode('utf-8'))
 			return
 
 		# guess correct content type and send file
@@ -52,12 +61,11 @@ class RequestHandler(BaseHTTPRequestHandler):
 	def checkAccess(self, targetPath):
 		# format targetPath to be an absolute path
 		if targetPath == '/': targetPath = '/index.html'
-		baseDir = os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
-		targetPath = os.path.abspath(baseDir + targetPath)
+		targetPath = os.path.abspath(PSERVER_BASEDIR + targetPath)
 
 		# make sure file exist and is allowed
 		isFileExisting = os.path.isfile(targetPath)
-		isFileAllowed = os.path.abspath(targetPath).startswith(baseDir)
+		isFileAllowed = os.path.abspath(targetPath).startswith(PSERVER_BASEDIR)
 		if not isFileAllowed:
 			print("Trying to read out of scope file: " + targetPath) # log this as it may be an attacker
 			raise PserverException('File does not exist')
@@ -70,18 +78,18 @@ class RequestHandler(BaseHTTPRequestHandler):
 	def do_POST(self):
 		starttime = time.time()
 		try:
-			# decode request json
+			#decode request json
 			req = dict()
 			if self.headers.get_all(name='content-length') != None:
 				length = int(self.headers.get_all(name='content-length')[0])
 				reqJson = str(self.rfile.read(length), 'utf-8')
 				req = json.loads(reqJson) if len(reqJson)>0 else dict()
-
-			# find and execute method
-			requestHandler = self.getRequestHandler(self.path)
-			result = self.executeApiMethod(requestHandler, req)
 		except ValueError as e:
 			raise PserverException("Request is not valid Json: " + reqJson)
+		try:
+			#find and execute method
+			requestHandler = self.getRequestHandler(self.path)
+			result = self.executeApiMethod(requestHandler, req)
 		except PserverException as e:
 			result = {
 				'status':'error',
@@ -93,9 +101,10 @@ class RequestHandler(BaseHTTPRequestHandler):
 				'result':'Processing exception: ' + traceback.format_exc()
 			}
 
-		# if result['status'] == 'error': print(json.dumps(result, indent=4))
+		#if result['status'] == 'error': print(json.dumps(result, indent=4))
 		print('{f} took {time}s to answer'.format(f = self.path, time = round(time.time()-starttime, 2)))
 
+		#return result
 		self.send_response(200)
 		self.send_header("Content-type", "application/json")
 		self.end_headers()
@@ -117,14 +126,13 @@ class RequestHandler(BaseHTTPRequestHandler):
 		except (KeyError, AttributeError) as e:
 			print("Unknown or invalid command: " + path)
 			raise PserverException('Unknown or invalid command')
-		print("Handling request: " + rhName + " in module " + rhModuleName)
 
 	def executeApiMethod(self, requestHandler, req):
-		rh = requestHandler(context, req)
+		rh = requestHandler(PSERVER_CONTEXT, req)
 		result = rh.execute_internal()
 		return result
 
-# Handle requests in a separate thread
+#Handle requests in a separate thread
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 	pass
 
@@ -134,7 +142,7 @@ class PServerRequestHandler:
 		self.args = args
 		self.checkArgs()
 	def checkArgs(self):
-		# TODO only the existance of the params is checked here. we need to be able to define the complete data structure
+		#TODO only the existance of the params is checked here. we need to be able to define the complete data structure
 		expectedArgs = inspect.getargspec(self.execute).args
 		expectedArgs.remove('self')
 		expectedArgs.sort()
@@ -159,22 +167,46 @@ class PServerRequestHandler:
 		if not (isinstance(result, dict) and 'status' in result and 'result' in result):
 			raise PserverException('Bad result format: ' + str(result))
 
-PORT = 80
-server = None
-context = {}
-def start():
-	global server
-	server = ThreadedHTTPServer(('', PORT), RequestHandler)
-	t = threading.Thread(target=server.serve_forever)
-	t.daemon = True
-	t.start()
-	print("Started PServer")
-
-def stop():
-	print("Stopping PServer...")
-	server.shutdown()
-	print("Stopped PServer")
-
-def setContext(c):
-	global context
-	context = c
+PSERVER_BASEDIR = ''
+PSERVER_CONTEXT = dict()
+class PServer:
+	def __init__(self, config=dict()):
+		self.server = None
+		self.context = {}
+		self.config = self.parseConfig(config)
+		global PSERVER_BASEDIR
+		PSERVER_BASEDIR = self.config['baseDir']
+		
+	def parseConfig(self, newConfig):
+		config = dict()
+		
+		# port
+		try:
+			config['port'] = int(newConfig['port']) if 'port' in newConfig else 80
+		except ValueError:
+			raise PserverException('Error parsing config: "port" must be a number')
+		
+		# html baseDir
+		config['baseDir'] = os.path.abspath(str(newConfig['baseDir'])) if 'baseDir' in newConfig else os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
+		config['baseDir'] = os.path.abspath(config['baseDir'])
+		if not os.path.exists(config['baseDir']): raise PserverException('Error parsing config: "baseDir" does not exist: ' + config['baseDir'])
+		
+		return config
+		
+	def start(self):
+		self.server = ThreadedHTTPServer(('', self.config['port']), RequestHandler)
+		t = threading.Thread(target=self.server.serve_forever)
+		t.daemon = True
+		t.start()
+		print("Started PServer")
+	
+	def stop(self):
+		print("Stopping PServer...")
+		self.server.shutdown()
+		print("Stopped PServer")
+	
+	def setContext(self, c):
+		if type(c) is not dict: raise PserverException('Error: Context must be a dict, recieved ' + str(type(c)))
+		self.context = c
+		global PSERVER_CONTEXT
+		PSERVER_CONTEXT = self.context

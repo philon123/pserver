@@ -8,12 +8,12 @@ import threading
 import traceback
 import inspect
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 class PserverException(Exception):
 	pass
 
-def to_json(python_object): #serialze bytes objects
+def to_json(python_object): #serialize bytes objects
 	if isinstance(python_object, bytes): return python_object.decode('utf-8')
 	raise TypeError(repr(python_object) + ' is not JSON serializable')
 
@@ -80,11 +80,11 @@ class RequestHandler(BaseHTTPRequestHandler):
 		try:
 			#decode request json
 			req = dict()
-			if self.headers.get_all(name='content-length') != None:
+			if self.headers.get_all(name='content-length') is not None:
 				length = int(self.headers.get_all(name='content-length')[0])
 				reqJson = str(self.rfile.read(length), 'utf-8')
 				req = json.loads(reqJson) if len(reqJson)>0 else dict()
-		except ValueError as e:
+		except ValueError:
 			raise PserverException("Request is not valid Json: " + reqJson)
 		try:
 			#find and execute method
@@ -96,13 +96,14 @@ class RequestHandler(BaseHTTPRequestHandler):
 				'result': str(e)
 			}
 		except Exception as e:
+			print('Processing exception: ' + traceback.format_exc())
 			result = {
 				'status':'error',
-				'result':'Processing exception: ' + traceback.format_exc()
+				'result':'Processing exception'
 			}
 
 		#if result['status'] == 'error': print(json.dumps(result, indent=4))
-		print('{f} took {time}s to answer'.format(f = self.path, time = round(time.time()-starttime, 2)))
+		#print('{f} took {time}s to answer'.format(f = self.path, time = round(time.time()-starttime, 2)))
 
 		#return result
 		self.send_response(200)
@@ -148,9 +149,10 @@ class PServerRequestHandler:
 		expectedArgs.sort()
 		gotArgs = sorted(list(self.args.keys()))
 		if gotArgs != expectedArgs:
-			raise PserverException('Problem with parameters: Expected {expected}, got {got}'
-				.format(expected = expectedArgs, got = gotArgs)
-			)
+			raise PserverException('Problem with parameters: Expected {expected}, got {got}'.format(
+				expected = expectedArgs,
+				got = gotArgs
+			))
 	def execute_internal(self):
 		self.preExec()
 		result = self.execute(**self.args)

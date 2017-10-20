@@ -88,8 +88,8 @@ class RequestHandler(BaseHTTPRequestHandler):
 			raise PserverException("Request is not valid Json: " + reqJson)
 		try:
 			#find and execute method
-			requestHandler = self.getRequestHandler(self.path)
-			result = self.executeApiMethod(requestHandler, req)
+			requestHandlerClass = self.getRequestHandlerClass(self.path)
+			result = self.executeApiMethod(requestHandlerClass, req)
 		except PserverException as e:
 			result = {
 				'status':'error',
@@ -111,7 +111,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 		self.end_headers()
 		self.wfile.write(bytes(json.dumps(result, indent=4, default=to_json), 'utf-8'))
 
-	def getRequestHandler(self, path):
+	def getRequestHandlerClass(self, path):
 		if path == '':
 			print("Aborted handling request because no command was given. ")
 			raise PserverException('You need to specify a command')

@@ -46,6 +46,9 @@ request: `curl -X POST http://127.0.0.1/mymodule/insertToDb --data '{"name":"Phi
 
 # Changelog / feature list
 
+v1.6.0
+* Add http SimpleAuth by adding to the config `"simpleAuth": "user:pass"`
+
 v1.5.0
 * Allow configuration of port and baseDir
 

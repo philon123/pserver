@@ -7,8 +7,9 @@ from socketserver import ThreadingMixIn
 import threading
 import traceback
 import inspect
+import base64
 
-VERSION = "1.5.1"
+VERSION = "1.6.0"
 
 class PserverException(Exception):
 	pass
@@ -26,8 +27,31 @@ class RequestHandler(BaseHTTPRequestHandler):
 		self.send_response(200)
 		self.send_header("Content-type", "application/json")
 		self.end_headers()
+	
+	def do_AUTHHEAD(self):
+		self.send_response(401)
+		self.send_header('WWW-Authenticate', 'Basic realm=\"PServer\"')
+		self.send_header('Content-type', 'text/html')
+		self.end_headers()
+		
+	def authenticate(self):
+		if PSERVER_SIMPLEAUTH is not None:
+			if self.headers.get('Authorization') is None:
+				self.do_AUTHHEAD()
+				self.wfile.write('not authenticated'.encode('utf-8'))
+				return False
+			elif self.headers.get('Authorization') != PSERVER_SIMPLEAUTH:
+				self.do_AUTHHEAD()
+				print('Login failed from IP ' + self.client_address[0])
+				self.wfile.write('not authenticated'.encode('utf-8'))
+				return False
+		return True
 
 	def do_GET(self):
+		# check authentication.
+		if not self.authenticate():
+			return
+	
 		# check file exists and is allowed to access
 		try:
 			targetPath = self.checkAccess(self.path)
@@ -76,6 +100,10 @@ class RequestHandler(BaseHTTPRequestHandler):
 		return targetPath
 
 	def do_POST(self):
+		# check authentication.
+		if not self.authenticate():
+			return
+		
 		starttime = time.time()
 		try:
 			#decode request json
@@ -170,6 +198,7 @@ class PServerRequestHandler:
 			raise PserverException('Bad result format: ' + str(result))
 
 PSERVER_BASEDIR = ''
+PSERVER_SIMPLEAUTH = None
 PSERVER_CONTEXT = dict()
 class PServer:
 	def __init__(self, config=dict()):
@@ -178,6 +207,8 @@ class PServer:
 		self.config = self.parseConfig(config)
 		global PSERVER_BASEDIR
 		PSERVER_BASEDIR = self.config['baseDir']
+		global PSERVER_SIMPLEAUTH
+		PSERVER_SIMPLEAUTH = self.config['simpleAuth']
 		
 	def parseConfig(self, newConfig):
 		config = dict()
@@ -192,6 +223,10 @@ class PServer:
 		config['baseDir'] = os.path.abspath(str(newConfig['baseDir'])) if 'baseDir' in newConfig else os.path.dirname(os.path.abspath(sys.argv[0])) + '/html'
 		config['baseDir'] = os.path.abspath(config['baseDir'])
 		if not os.path.exists(config['baseDir']): raise PserverException('Error parsing config: "baseDir" does not exist: ' + config['baseDir'])
+		
+		# authentication
+		config['simpleAuth'] = newConfig['simpleAuth'] if 'simpleAuth' in newConfig else ''
+		config['simpleAuth'] = ('Basic ' + base64.b64encode(config['simpleAuth'].encode('utf-8')).decode('utf-8')) if config['simpleAuth'] != '' else None
 		
 		return config
 		

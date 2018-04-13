@@ -6,7 +6,7 @@ import api #import your api
 
 if __name__ == '__main__':
 	# create pserver instance
-	ps = pserver.PServer()
+	ps = pserver.PServer(config = dict(simpleAuth="admin:admin"))
 	
 	#set some global context for the RequestHandlers to use. The context can be changed at any time
 	ps.setContext(dict(
